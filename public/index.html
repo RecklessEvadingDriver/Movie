@@ -337,6 +337,10 @@
       video.removeAttribute('src');
     }
 
+    function handleAutoplayError() {
+      setStatus('Autoplay was blocked. Press play to start.', 'error');
+    }
+
     async function playMovie(id) {
       const movie = state.movies.find((item) => item.id === id);
       if (!movie) return;
@@ -374,10 +378,10 @@
           });
           hlsPlayer.loadSource(stream.url);
           hlsPlayer.attachMedia(video);
-          hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+          hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(handleAutoplayError));
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
           video.src = stream.url;
-          video.play().catch(() => {});
+          video.play().catch(handleAutoplayError);
         } else {
           setStatus('Your browser does not support HLS playback.', 'error');
         }
@@ -391,10 +395,10 @@
           hlsPlayer = new Hls({ enableWorker: true });
           hlsPlayer.loadSource(movie.hlsUrl);
           hlsPlayer.attachMedia(video);
-          hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+          hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(handleAutoplayError));
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
           video.src = movie.hlsUrl;
-          video.play().catch(() => {});
+          video.play().catch(handleAutoplayError);
         } else {
           setStatus('Your browser does not support HLS playback.', 'error');
         }

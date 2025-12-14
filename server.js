@@ -87,7 +87,7 @@ app.get('/api/streams', async (req, res) => {
 
     res.json({ data: streams });
   } catch (error) {
-    console.error('[api/streams] Failed to load streams');
+    console.error('[api/streams] Failed to load streams:', error.message || error);
     res.status(500).json({ error: 'Failed to fetch streams' });
   }
 });

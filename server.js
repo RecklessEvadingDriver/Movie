@@ -3,7 +3,8 @@ const express = require('express');
 const { getStreams } = require('./castle');
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const parsedPort = parseInt(process.env.PORT, 10);
+const PORT = Number.isInteger(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
 
 const movies = [
   {
@@ -72,13 +73,18 @@ app.get('/api/movies', (_req, res) => {
 app.get('/api/streams', async (req, res) => {
   const { tmdbId, type = 'movie', season, episode } = req.query;
 
-  if (!tmdbId) {
-    return res.status(400).json({ error: 'tmdbId query param is required' });
+  if (!tmdbId || !/^[0-9]+$/.test(tmdbId)) {
+    return res.status(400).json({ error: 'tmdbId must be a numeric string' });
   }
 
   try {
     const seasonNum = season ? parseInt(season, 10) : undefined;
     const episodeNum = episode ? parseInt(episode, 10) : undefined;
+
+    if ((season && !Number.isInteger(seasonNum)) || (episode && !Number.isInteger(episodeNum))) {
+      return res.status(400).json({ error: 'season and episode must be numbers when provided' });
+    }
+
     const streams = await getStreams(tmdbId, type, seasonNum, episodeNum);
 
     if (!streams || streams.length === 0) {

@@ -14,6 +14,9 @@ const CHANNEL = 'IndiaA';
 const CLIENT = '1';
 const LANG = 'en-US';
 const SUFFIX = 'T!BgJB';
+const TIMEOUT_SHORT = 12000;
+const TIMEOUT_MEDIUM = 20000;
+const TIMEOUT_LONG = 30000;
 
 // Working headers for Castle API
 const WORKING_HEADERS = {
@@ -43,7 +46,7 @@ function decryptCastle(encryptedB64, securityKeyB64) {
 
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     if (controller) {
-        setTimeout(() => controller.abort(), 12000);
+        setTimeout(() => controller.abort(), TIMEOUT_SHORT);
     }
 
     return fetch(CASTLE_DECRYPT_URL, {
@@ -147,7 +150,7 @@ function getSecurityKey() {
     console.log('[Castle] Fetching security key...');
     const url = `${CASTLE_BASE}/v0.1/system/getSecurityKey/1?channel=${CHANNEL}&clientType=${CLIENT}&lang=${LANG}`;
     
-    return makeRequest(url, { timeout: 20000 })
+    return makeRequest(url, { timeout: TIMEOUT_MEDIUM })
         .then(function(response) {
             return response.json();
         })
@@ -177,7 +180,7 @@ function searchCastle(securityKey, keyword, page = 1, size = 30) {
     
     const url = `${CASTLE_BASE}/film-api/v1.1.0/movie/searchByKeyword?${params.toString()}`;
     
-    return makeRequest(url, { timeout: 30000 })
+    return makeRequest(url, { timeout: TIMEOUT_LONG })
         .then(function(response) {
             return extractCipherFromResponse(response);
         })
@@ -195,7 +198,7 @@ function getDetails(securityKey, movieId) {
     
     const url = `${CASTLE_BASE}/film-api/v1.1/movie?channel=${CHANNEL}&clientType=${CLIENT}&lang=${LANG}&movieId=${movieId}&packageName=${PKG}`;
     
-    return makeRequest(url, { timeout: 30000 })
+    return makeRequest(url, { timeout: TIMEOUT_LONG })
         .then(function(response) {
             return extractCipherFromResponse(response);
         })
@@ -231,7 +234,7 @@ function getVideo2(securityKey, movieId, episodeId, resolution = 2) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        timeout: 30000
+        timeout: TIMEOUT_LONG
     })
     .then(function(response) {
         return extractCipherFromResponse(response);
@@ -285,11 +288,16 @@ function extractDataBlock(obj) {
 
 // Get movie/TV show details from TMDB
 function getTMDBDetails(tmdbId, mediaType) {
-    if (!TMDB_API_KEY || !TMDB_API_KEY.trim()) {
+    const apiKey = TMDB_API_KEY && TMDB_API_KEY.trim();
+    if (!apiKey || apiKey.length < 8) {
         throw new Error('TMDB_API_KEY is required. Set the TMDB_API_KEY environment variable to enable TMDB lookups.');
     }
+    if (!tmdbId || !/^[0-9]+$/.test(String(tmdbId))) {
+        throw new Error('tmdbId must be a numeric string');
+    }
     const endpoint = mediaType === 'tv' ? 'tv' : 'movie';
-    const url = `${TMDB_BASE_URL}/${endpoint}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
+    const safeTmdbId = encodeURIComponent(tmdbId);
+    const url = `${TMDB_BASE_URL}/${endpoint}/${safeTmdbId}?api_key=${apiKey}&append_to_response=external_ids`;
     
     return makeRequest(url)
         .then(function(response) {

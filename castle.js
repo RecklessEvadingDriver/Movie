@@ -4,6 +4,8 @@
 
 // TMDB API Configuration
 const TMDB_API_KEY = typeof process !== 'undefined' ? process.env.TMDB_API_KEY : undefined;
+const CASTLE_DECRYPT_URL = typeof process !== 'undefined' ? process.env.CASTLE_DECRYPT_URL : undefined;
+const APK_SIGN_KEY = typeof process !== 'undefined' ? process.env.CASTLE_APK_SIGN_KEY : undefined;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const CASTLE_DECRYPT_URL = (typeof process !== 'undefined' && process.env.CASTLE_DECRYPT_URL) || 'https://aesdec.nuvioapp.space/decrypt-castle';
 
@@ -17,6 +19,13 @@ const SUFFIX = 'T!BgJB';
 const TIMEOUT_SHORT = 12000;
 const TIMEOUT_MEDIUM = 20000;
 const TIMEOUT_LONG = 30000;
+
+function requireApkSignKey() {
+    if (!APK_SIGN_KEY || !APK_SIGN_KEY.trim()) {
+        throw new Error('CASTLE_APK_SIGN_KEY is required for Castle playback.');
+    }
+    return APK_SIGN_KEY;
+}
 
 // Working headers for Castle API
 const WORKING_HEADERS = {
@@ -43,6 +52,10 @@ const PLAYBACK_HEADERS = {
 // AES-CBC Decryption using remote server (Castle-specific)
 function decryptCastle(encryptedB64, securityKeyB64) {
     console.log('[Castle] Starting Castle-specific AES-CBC decryption...');
+
+    if (!CASTLE_DECRYPT_URL || !CASTLE_DECRYPT_URL.trim()) {
+        throw new Error('CASTLE_DECRYPT_URL is required to perform decryption.');
+    }
 
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     if (controller) {
@@ -215,13 +228,14 @@ function getVideo2(securityKey, movieId, episodeId, resolution = 2) {
     console.log(`[Castle] Fetching video (v2) for movieId: ${movieId}, episodeId: ${episodeId}, resolution: ${resolution}`);
     
     const url = `${CASTLE_BASE}/film-api/v2.0.1/movie/getVideo2?clientType=${CLIENT}&packageName=${PKG}&channel=${CHANNEL}&lang=${LANG}`;
+    const apkSignKey = requireApkSignKey();
     
     const body = {
         mode: '1',
         appMarket: 'GuanWang',
         clientType: '1',
         woolUser: 'false',
-        apkSignKey: 'ED0955EB04E67A1D9F3305B95454FED485261475',
+        apkSignKey: apkSignKey,
         androidVersion: '13',
         movieId: movieId,
         episodeId: episodeId,
@@ -251,8 +265,9 @@ function getVideo2(securityKey, movieId, episodeId, resolution = 2) {
 function getVideoV1(securityKey, movieId, episodeId, languageId, resolution = 2) {
     console.log(`[Castle] Fetching video (v1) for movieId: ${movieId}, episodeId: ${episodeId}, languageId: ${languageId}, resolution: ${resolution}`);
     
+    const apkSignKey = requireApkSignKey();
     const params = new URLSearchParams({
-        apkSignKey: 'ED0955EB04E67A1D9F3305B95454FED485261475',
+        apkSignKey: apkSignKey,
         channel: CHANNEL,
         clientType: CLIENT,
         episodeId: episodeId.toString(),
@@ -289,7 +304,7 @@ function extractDataBlock(obj) {
 // Get movie/TV show details from TMDB
 function getTMDBDetails(tmdbId, mediaType) {
     const apiKey = TMDB_API_KEY && TMDB_API_KEY.trim();
-    if (!apiKey || apiKey.length < 8) {
+    if (!apiKey || apiKey.length < 8 || !/^[A-Za-z0-9]+$/.test(apiKey)) {
         throw new Error('TMDB_API_KEY is required. Set the TMDB_API_KEY environment variable to enable TMDB lookups.');
     }
     if (!tmdbId || !/^[0-9]+$/.test(String(tmdbId))) {

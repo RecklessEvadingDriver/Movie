@@ -381,7 +381,7 @@
           video.src = stream.url;
           video.play().catch(() => {});
         } else {
-          alert('Your browser does not support HLS playback.');
+          setStatus('Your browser does not support HLS playback.', 'error');
         }
 
         setStatus('Streaming via Castle', 'info');
@@ -398,7 +398,7 @@
           video.src = movie.hlsUrl;
           video.play().catch(() => {});
         } else {
-          alert('Your browser does not support HLS playback.');
+          setStatus('Your browser does not support HLS playback.', 'error');
         }
       }
     }

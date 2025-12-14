@@ -3,7 +3,7 @@
 // Extracts streaming links using TMDB ID for Castle API with AES-CBC decryption
 
 // TMDB API Configuration
-const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
+const TMDB_API_KEY = (typeof process !== 'undefined' && process.env.TMDB_API_KEY) || '439c478a771f35c05022f9feabcca01c';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
 // Castle API Configuration
@@ -39,10 +39,16 @@ const PLAYBACK_HEADERS = {
 // AES-CBC Decryption using remote server (Castle-specific)
 function decryptCastle(encryptedB64, securityKeyB64) {
     console.log('[Castle] Starting Castle-specific AES-CBC decryption...');
-    
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    if (controller) {
+        setTimeout(() => controller.abort(), 12000);
+    }
+
     return fetch('https://aesdec.nuvioapp.space/decrypt-castle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller ? controller.signal : undefined,
         body: JSON.stringify({
             encryptedData: encryptedB64,
             securityKey: securityKeyB64
@@ -604,6 +610,6 @@ function getStreams(tmdbId, mediaType, seasonNum, episodeNum) {
 // Export for React Native compatibility
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { getStreams };
-} else {
-    global.getStreams = getStreams;
+} else if (typeof globalThis !== 'undefined') {
+    globalThis.CastleAPI = { getStreams };
 }

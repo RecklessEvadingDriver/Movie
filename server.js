@@ -3,7 +3,10 @@ const express = require('express');
 const { getStreams } = require('./castle');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = (() => {
+  const parsed = parseInt(process.env.PORT, 10);
+  return parsed >= 1 && parsed <= 65535 ? parsed : 3000;
+})();
 
 const movies = [
   {
@@ -84,7 +87,7 @@ app.get('/api/streams', async (req, res) => {
 
     res.json({ data: streams });
   } catch (error) {
-    console.error('[api/streams] Failed to load streams', error);
+    console.error('[api/streams] Failed to load streams:', error ? error.message : 'unknown error');
     res.status(500).json({ error: 'Failed to fetch streams' });
   }
 });

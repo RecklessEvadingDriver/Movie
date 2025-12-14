@@ -286,7 +286,7 @@ function extractDataBlock(obj) {
 // Get movie/TV show details from TMDB
 function getTMDBDetails(tmdbId, mediaType) {
     if (!TMDB_API_KEY) {
-        throw new Error('TMDB_API_KEY is required. Set the TMDB_API_KEY environment variable to enable Castle streams.');
+        throw new Error('TMDB_API_KEY is required. Set the TMDB_API_KEY environment variable to enable TMDB lookups.');
     }
     const endpoint = mediaType === 'tv' ? 'tv' : 'movie';
     const url = `${TMDB_BASE_URL}/${endpoint}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
@@ -602,12 +602,12 @@ function getStreams(tmdbId, mediaType, seasonNum, episodeNum) {
                     return qualityB - qualityA; // Higher quality first
                 });
 
-                resolve(streams);
-            })
-            .catch(function(error) {
-                console.error(`[Castle] Error: ${error.message}`);
-                resolve([]); // Return empty array on error for Nuvio compatibility
-            });
+            resolve(streams);
+        })
+        .catch(function(error) {
+            console.error(`[Castle] Error: ${error.message}`);
+            reject(error);
+        });
     });
 }
 

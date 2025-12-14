@@ -7,7 +7,6 @@ const TMDB_API_KEY = typeof process !== 'undefined' ? process.env.TMDB_API_KEY :
 const CASTLE_DECRYPT_URL = typeof process !== 'undefined' ? process.env.CASTLE_DECRYPT_URL : undefined;
 const APK_SIGN_KEY = typeof process !== 'undefined' ? process.env.CASTLE_APK_SIGN_KEY : undefined;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
-const CASTLE_DECRYPT_URL = (typeof process !== 'undefined' && process.env.CASTLE_DECRYPT_URL) || 'https://aesdec.nuvioapp.space/decrypt-castle';
 
 // Castle API Configuration
 const CASTLE_BASE = 'https://api.fstcy.com';
@@ -281,7 +280,7 @@ function getVideoV1(securityKey, movieId, episodeId, languageId, resolution = 2)
     
     const url = `${CASTLE_BASE}/film-api/v1.9.1/movie/getVideo?${params.toString()}`;
     
-    return makeRequest(url, { timeout: 30000 })
+    return makeRequest(url, { timeout: TIMEOUT_LONG })
         .then(function(response) {
             return extractCipherFromResponse(response);
         })
@@ -304,7 +303,7 @@ function extractDataBlock(obj) {
 // Get movie/TV show details from TMDB
 function getTMDBDetails(tmdbId, mediaType) {
     const apiKey = TMDB_API_KEY && TMDB_API_KEY.trim();
-    if (!apiKey || apiKey.length < 8 || !/^[A-Za-z0-9]+$/.test(apiKey)) {
+    if (!apiKey || apiKey.length < 8 || !/^[A-Za-z0-9_-]+$/.test(apiKey)) {
         throw new Error('TMDB_API_KEY is required. Set the TMDB_API_KEY environment variable to enable TMDB lookups.');
     }
     if (!tmdbId || !/^[0-9]+$/.test(String(tmdbId))) {

@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const { getStreams } = require('./castle');
 
@@ -59,7 +60,12 @@ const movies = [
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/hls.min.js', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'node_modules', 'hls.js', 'dist', 'hls.min.js'));
+  const hlsPath = path.join(__dirname, 'node_modules', 'hls.js', 'dist', 'hls.min.js');
+  if (!fs.existsSync(hlsPath)) {
+    return res.status(500).send('HLS bundle missing');
+  }
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  res.sendFile(hlsPath);
 });
 
 app.get('/api/health', (_req, res) => {

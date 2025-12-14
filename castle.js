@@ -3,7 +3,9 @@
 // Extracts streaming links using TMDB ID for Castle API with AES-CBC decryption
 
 // TMDB API Configuration
-const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
+const TMDB_API_KEY = typeof process !== 'undefined' ? process.env.TMDB_API_KEY : undefined;
+const CASTLE_DECRYPT_URL = typeof process !== 'undefined' ? process.env.CASTLE_DECRYPT_URL : undefined;
+const APK_SIGN_KEY = typeof process !== 'undefined' ? process.env.CASTLE_APK_SIGN_KEY : undefined;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
 // Castle API Configuration
@@ -13,6 +15,33 @@ const CHANNEL = 'IndiaA';
 const CLIENT = '1';
 const LANG = 'en-US';
 const SUFFIX = 'T!BgJB';
+const TIMEOUT_SHORT = 12000;
+const TIMEOUT_MEDIUM = 20000;
+const TIMEOUT_LONG = 30000;
+
+function requireApkSignKey() {
+    if (!APK_SIGN_KEY || !APK_SIGN_KEY.trim()) {
+        throw new Error('CASTLE_APK_SIGN_KEY is required for Castle playback.');
+    }
+    return APK_SIGN_KEY;
+}
+
+function mapSearchItem(item) {
+    const title = item.title || item.name || 'Unknown';
+    const year = item.releaseYear || item.year || null;
+    const tmdbId = item.redirectId || item.redirectIdStr || item.id || null;
+    const mediaType = item.contentType === 2 ? 'tv' : 'movie';
+    const poster = item.coverVertical || item.coverHorizontal || item.cover || '';
+    return {
+        id: tmdbId ? String(tmdbId) : undefined,
+        title,
+        year,
+        mediaType,
+        poster,
+        runtime: item.duration ? `${item.duration} min` : '',
+        rating: item.rating || ''
+    };
+}
 
 // Working headers for Castle API
 const WORKING_HEADERS = {
@@ -39,10 +68,20 @@ const PLAYBACK_HEADERS = {
 // AES-CBC Decryption using remote server (Castle-specific)
 function decryptCastle(encryptedB64, securityKeyB64) {
     console.log('[Castle] Starting Castle-specific AES-CBC decryption...');
-    
-    return fetch('https://aesdec.nuvioapp.space/decrypt-castle', {
+
+    if (!CASTLE_DECRYPT_URL || !CASTLE_DECRYPT_URL.trim()) {
+        throw new Error('CASTLE_DECRYPT_URL is required to perform decryption.');
+    }
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    if (controller) {
+        setTimeout(() => controller.abort(), TIMEOUT_SHORT);
+    }
+
+    return fetch(CASTLE_DECRYPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller ? controller.signal : undefined,
         body: JSON.stringify({
             encryptedData: encryptedB64,
             securityKey: securityKeyB64
@@ -140,7 +179,7 @@ function getSecurityKey() {
     console.log('[Castle] Fetching security key...');
     const url = `${CASTLE_BASE}/v0.1/system/getSecurityKey/1?channel=${CHANNEL}&clientType=${CLIENT}&lang=${LANG}`;
     
-    return makeRequest(url, { timeout: 20000 })
+    return makeRequest(url, { timeout: TIMEOUT_MEDIUM })
         .then(function(response) {
             return response.json();
         })
@@ -170,7 +209,7 @@ function searchCastle(securityKey, keyword, page = 1, size = 30) {
     
     const url = `${CASTLE_BASE}/film-api/v1.1.0/movie/searchByKeyword?${params.toString()}`;
     
-    return makeRequest(url, { timeout: 30000 })
+    return makeRequest(url, { timeout: TIMEOUT_LONG })
         .then(function(response) {
             return extractCipherFromResponse(response);
         })
@@ -188,7 +227,7 @@ function getDetails(securityKey, movieId) {
     
     const url = `${CASTLE_BASE}/film-api/v1.1/movie?channel=${CHANNEL}&clientType=${CLIENT}&lang=${LANG}&movieId=${movieId}&packageName=${PKG}`;
     
-    return makeRequest(url, { timeout: 30000 })
+    return makeRequest(url, { timeout: TIMEOUT_LONG })
         .then(function(response) {
             return extractCipherFromResponse(response);
         })
@@ -205,13 +244,14 @@ function getVideo2(securityKey, movieId, episodeId, resolution = 2) {
     console.log(`[Castle] Fetching video (v2) for movieId: ${movieId}, episodeId: ${episodeId}, resolution: ${resolution}`);
     
     const url = `${CASTLE_BASE}/film-api/v2.0.1/movie/getVideo2?clientType=${CLIENT}&packageName=${PKG}&channel=${CHANNEL}&lang=${LANG}`;
+    const apkSignKey = requireApkSignKey();
     
     const body = {
         mode: '1',
         appMarket: 'GuanWang',
         clientType: '1',
         woolUser: 'false',
-        apkSignKey: 'ED0955EB04E67A1D9F3305B95454FED485261475',
+        apkSignKey: apkSignKey,
         androidVersion: '13',
         movieId: movieId,
         episodeId: episodeId,
@@ -224,7 +264,7 @@ function getVideo2(securityKey, movieId, episodeId, resolution = 2) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        timeout: 30000
+        timeout: TIMEOUT_LONG
     })
     .then(function(response) {
         return extractCipherFromResponse(response);
@@ -241,8 +281,9 @@ function getVideo2(securityKey, movieId, episodeId, resolution = 2) {
 function getVideoV1(securityKey, movieId, episodeId, languageId, resolution = 2) {
     console.log(`[Castle] Fetching video (v1) for movieId: ${movieId}, episodeId: ${episodeId}, languageId: ${languageId}, resolution: ${resolution}`);
     
+    const apkSignKey = requireApkSignKey();
     const params = new URLSearchParams({
-        apkSignKey: 'ED0955EB04E67A1D9F3305B95454FED485261475',
+        apkSignKey: apkSignKey,
         channel: CHANNEL,
         clientType: CLIENT,
         episodeId: episodeId.toString(),
@@ -256,7 +297,7 @@ function getVideoV1(securityKey, movieId, episodeId, languageId, resolution = 2)
     
     const url = `${CASTLE_BASE}/film-api/v1.9.1/movie/getVideo?${params.toString()}`;
     
-    return makeRequest(url, { timeout: 30000 })
+    return makeRequest(url, { timeout: TIMEOUT_LONG })
         .then(function(response) {
             return extractCipherFromResponse(response);
         })
@@ -278,8 +319,16 @@ function extractDataBlock(obj) {
 
 // Get movie/TV show details from TMDB
 function getTMDBDetails(tmdbId, mediaType) {
+    const apiKey = TMDB_API_KEY && TMDB_API_KEY.trim();
+    if (!apiKey || apiKey.length < 8 || !/^[A-Za-z0-9_-]+$/.test(apiKey)) {
+        throw new Error('TMDB_API_KEY is required. Set the TMDB_API_KEY environment variable to enable TMDB lookups.');
+    }
+    if (!tmdbId || !/^[0-9]+$/.test(String(tmdbId))) {
+        throw new Error('tmdbId must be a numeric string');
+    }
     const endpoint = mediaType === 'tv' ? 'tv' : 'movie';
-    const url = `${TMDB_BASE_URL}/${endpoint}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
+    const safeTmdbId = encodeURIComponent(tmdbId);
+    const url = `${TMDB_BASE_URL}/${endpoint}/${safeTmdbId}?api_key=${apiKey}&append_to_response=external_ids`;
     
     return makeRequest(url)
         .then(function(response) {
@@ -422,188 +471,203 @@ function processVideoResponse(videoData, mediaInfo, seasonNum, episodeNum, resol
 function getStreams(tmdbId, mediaType, seasonNum, episodeNum) {
     console.log(`[Castle] Starting extraction for TMDB ID: ${tmdbId}, Type: ${mediaType}${mediaType === 'tv' ? `, S:${seasonNum}E:${episodeNum}` : ''}`);
     
-    return new Promise(function(resolve, reject) {
-        // Step 1: Get TMDB details
-        getTMDBDetails(tmdbId, mediaType)
-            .then(function(tmdbInfo) {
-                console.log(`[Castle] TMDB Info: "${tmdbInfo.title}" (${tmdbInfo.year || 'N/A'})`);
-                
-                // Step 2: Get security key
-                return getSecurityKey().then(function(securityKey) {
-                    return { tmdbInfo: tmdbInfo, securityKey: securityKey };
-                });
-            })
-            .then(function(context) {
-                const { tmdbInfo, securityKey } = context;
-                
-                // Step 3: Find Castle movie ID
-                return findCastleMovieId(securityKey, tmdbInfo).then(function(movieId) {
-                    return { tmdbInfo: tmdbInfo, securityKey: securityKey, movieId: movieId };
-                });
-            })
-            .then(function(context) {
-                const { tmdbInfo, securityKey, movieId } = context;
-                
-                // Step 4: Get details
-                return getDetails(securityKey, movieId).then(function(details) {
-                    return { tmdbInfo: tmdbInfo, securityKey: securityKey, movieId: movieId, details: details };
-                });
-            })
-            .then(function(context) {
-                const { tmdbInfo, securityKey, movieId, details } = context;
-                
-                // Step 5: Handle seasons/episodes for TV shows
-                let finalMovieId = movieId;
-                let finalDetails = details;
-                
-                if (mediaType === 'tv' && seasonNum && episodeNum) {
-                    const data = extractDataBlock(details);
-                    const seasons = data.seasons || [];
-                    
-                    // Find the season
-                    const season = seasons.find(function(s) {
-                        return s.number === seasonNum;
-                    });
-                    
-                    if (season && season.movieId && season.movieId !== movieId) {
-                        console.log(`[Castle] Fetching season ${seasonNum} details...`);
-                        return getDetails(securityKey, season.movieId.toString()).then(function(seasonDetails) {
-                            return {
-                                tmdbInfo: tmdbInfo,
-                                securityKey: securityKey,
-                                movieId: season.movieId.toString(),
-                                details: seasonDetails
-                            };
-                        });
-                    }
-                }
-                
-                return Promise.resolve({
-                    tmdbInfo: tmdbInfo,
-                    securityKey: securityKey,
-                    movieId: finalMovieId,
-                    details: finalDetails
-                });
-            })
-            .then(function(context) {
-                const { tmdbInfo, securityKey, movieId, details } = context;
-                
-                // Step 6: Find episode ID
-                const data = extractDataBlock(details);
-                const episodes = data.episodes || [];
-                
-                let episodeId = null;
-                if (mediaType === 'tv' && seasonNum && episodeNum) {
-                    const episode = episodes.find(function(e) {
-                        return e.number === episodeNum;
-                    });
-                    if (episode && episode.id) {
-                        episodeId = episode.id.toString();
-                    }
-                } else if (episodes.length > 0) {
-                    // For movies, use first episode if available
-                    episodeId = episodes[0].id.toString();
-                }
-                
-                if (!episodeId) {
-                    throw new Error('Could not find episode ID');
-                }
-                
-                // Step 7: Check for language-specific tracks
-                const episode = episodes.find(function(e) {
-                    return e.id.toString() === episodeId;
-                });
-                const tracks = (episode && episode.tracks) || [];
-                const hasIndividualVideo = tracks.some(function(t) {
-                    return t.existIndividualVideo === true;
-                });
-                
-                // Step 8: Get video URLs for ALL available languages
-                const resolution = 2; // Default to 720p
-                const allStreams = [];
-                
-                // Process all language tracks
-                const processLanguages = function(langIndex) {
-                    if (langIndex >= tracks.length) {
-                        // All languages processed, return combined streams
-                        console.log(`[Castle] Total streams from all languages: ${allStreams.length}`);
-                        return Promise.resolve(allStreams);
-                    }
-                    
-                    const track = tracks[langIndex];
-                    const langName = track.languageName || track.abbreviate || `Lang${langIndex + 1}`;
-                    
-                    if (track.existIndividualVideo && track.languageId) {
-                        // Try v1 for this language
-                        console.log(`[Castle] Fetching ${langName} (v1, languageId: ${track.languageId})`);
-                        
-                        return getVideoV1(securityKey, movieId, episodeId, track.languageId, resolution)
-                            .then(function(videoData) {
-                                const langStreams = processVideoResponse(
-                                    videoData, 
-                                    tmdbInfo, 
-                                    seasonNum, 
-                                    episodeNum, 
-                                    resolution, 
-                                    `[${langName}]`
-                                );
-                                
-                                if (langStreams.length > 0) {
-                                    console.log(`[Castle] ✅ ${langName}: Found ${langStreams.length} streams`);
-                                    allStreams.push(...langStreams);
-                                } else {
-                                    console.log(`[Castle] ⚠️  ${langName}: v1 returned no streams`);
-                                }
-                                
-                                return processLanguages(langIndex + 1);
-                            })
-                            .catch(function(error) {
-                                console.log(`[Castle] ⚠️  ${langName}: v1 failed - ${error.message}`);
-                                return processLanguages(langIndex + 1);
-                            });
-                    } else {
-                        // No individual video, skip this language
-                        console.log(`[Castle] ⏭️  ${langName}: No individual video available`);
-                        return processLanguages(langIndex + 1);
-                    }
-                };
-                
-                return processLanguages(0)
-                    .then(function(langStreams) {
-                        if (langStreams.length > 0) {
-                            return langStreams;
-                        }
-                        
-                        // Fallback: Use shared stream (v2) if no individual videos worked
-                        console.log(`[Castle] All individual videos failed, falling back to shared stream (v2)`);
-                        return getVideo2(securityKey, movieId, episodeId, resolution)
-                            .then(function(videoData) {
-                                return processVideoResponse(videoData, tmdbInfo, seasonNum, episodeNum, resolution, '[Shared]');
-                            });
-                    });
-            })
-            .then(function(streams) {
-                console.log(`[Castle] Total streams found: ${streams.length}`);
-
-                // Sort streams by quality (highest first)
-                streams.sort(function(a, b) {
-                    const qualityA = getQualityValue(a.quality);
-                    const qualityB = getQualityValue(b.quality);
-                    return qualityB - qualityA; // Higher quality first
-                });
-
-                resolve(streams);
-            })
-            .catch(function(error) {
-                console.error(`[Castle] Error: ${error.message}`);
-                resolve([]); // Return empty array on error for Nuvio compatibility
+    // Step 1: Get TMDB details
+    return getTMDBDetails(tmdbId, mediaType)
+        .then(function(tmdbInfo) {
+            console.log(`[Castle] TMDB Info: "${tmdbInfo.title}" (${tmdbInfo.year || 'N/A'})`);
+            
+            // Step 2: Get security key
+            return getSecurityKey().then(function(securityKey) {
+                return { tmdbInfo: tmdbInfo, securityKey: securityKey };
             });
-    });
+        })
+        .then(function(context) {
+            const { tmdbInfo, securityKey } = context;
+            
+            // Step 3: Find Castle movie ID
+            return findCastleMovieId(securityKey, tmdbInfo).then(function(movieId) {
+                return { tmdbInfo: tmdbInfo, securityKey: securityKey, movieId: movieId };
+            });
+        })
+        .then(function(context) {
+            const { tmdbInfo, securityKey, movieId } = context;
+            
+            // Step 4: Get details
+            return getDetails(securityKey, movieId).then(function(details) {
+                return { tmdbInfo: tmdbInfo, securityKey: securityKey, movieId: movieId, details: details };
+            });
+        })
+        .then(function(context) {
+            const { tmdbInfo, securityKey, movieId, details } = context;
+            
+            // Step 5: Handle seasons/episodes for TV shows
+            let finalMovieId = movieId;
+            let finalDetails = details;
+            
+            if (mediaType === 'tv' && seasonNum && episodeNum) {
+                const data = extractDataBlock(details);
+                const seasons = data.seasons || [];
+                
+                // Find the season
+                const season = seasons.find(function(s) {
+                    return s.number === seasonNum;
+                });
+                
+                if (season && season.movieId && season.movieId !== movieId) {
+                    console.log(`[Castle] Fetching season ${seasonNum} details...`);
+                    return getDetails(securityKey, season.movieId.toString()).then(function(seasonDetails) {
+                        return {
+                            tmdbInfo: tmdbInfo,
+                            securityKey: securityKey,
+                            movieId: season.movieId.toString(),
+                            details: seasonDetails
+                        };
+                    });
+                }
+            }
+            
+            return Promise.resolve({
+                tmdbInfo: tmdbInfo,
+                securityKey: securityKey,
+                movieId: finalMovieId,
+                details: finalDetails
+            });
+        })
+        .then(function(context) {
+            const { tmdbInfo, securityKey, movieId, details } = context;
+            
+            // Step 6: Find episode ID
+            const data = extractDataBlock(details);
+            const episodes = data.episodes || [];
+            
+            let episodeId = null;
+            if (mediaType === 'tv' && seasonNum && episodeNum) {
+                const episode = episodes.find(function(e) {
+                    return e.number === episodeNum;
+                });
+                if (episode && episode.id) {
+                    episodeId = episode.id.toString();
+                }
+            } else if (episodes.length > 0) {
+                // For movies, use first episode if available
+                episodeId = episodes[0].id.toString();
+            }
+            
+            if (!episodeId) {
+                throw new Error('Could not find episode ID');
+            }
+            
+            // Step 7: Check for language-specific tracks
+            const episode = episodes.find(function(e) {
+                return e.id.toString() === episodeId;
+            });
+            const tracks = (episode && episode.tracks) || [];
+            const hasIndividualVideo = tracks.some(function(t) {
+                return t.existIndividualVideo === true;
+            });
+            
+            // Step 8: Get video URLs for ALL available languages
+            const resolution = 2; // Default to 720p
+            const allStreams = [];
+            
+            // Process all language tracks
+            const processLanguages = function(langIndex) {
+                if (langIndex >= tracks.length) {
+                    // All languages processed, return combined streams
+                    console.log(`[Castle] Total streams from all languages: ${allStreams.length}`);
+                    return Promise.resolve(allStreams);
+                }
+                
+                const track = tracks[langIndex];
+                const langName = track.languageName || track.abbreviate || `Lang${langIndex + 1}`;
+                
+                if (track.existIndividualVideo && track.languageId) {
+                    // Try v1 for this language
+                    console.log(`[Castle] Fetching ${langName} (v1, languageId: ${track.languageId})`);
+                    
+                    return getVideoV1(securityKey, movieId, episodeId, track.languageId, resolution)
+                        .then(function(videoData) {
+                            const langStreams = processVideoResponse(
+                                videoData, 
+                                tmdbInfo, 
+                                seasonNum, 
+                                episodeNum, 
+                                resolution, 
+                                `[${langName}]`
+                            );
+                            
+                            if (langStreams.length > 0) {
+                                console.log(`[Castle] ✅ ${langName}: Found ${langStreams.length} streams`);
+                                allStreams.push(...langStreams);
+                            } else {
+                                console.log(`[Castle] ⚠️  ${langName}: v1 returned no streams`);
+                            }
+                            
+                            return processLanguages(langIndex + 1);
+                        })
+                        .catch(function(error) {
+                            console.log(`[Castle] ⚠️  ${langName}: v1 failed - ${error.message}`);
+                            return processLanguages(langIndex + 1);
+                        });
+                } else {
+                    // No individual video, skip this language
+                    console.log(`[Castle] ⏭️  ${langName}: No individual video available`);
+                    return processLanguages(langIndex + 1);
+                }
+            };
+            
+            return processLanguages(0)
+                .then(function(langStreams) {
+                    if (langStreams.length > 0) {
+                        return langStreams;
+                    }
+                    
+                    // Fallback: Use shared stream (v2) if no individual videos worked
+                    console.log(`[Castle] All individual videos failed, falling back to shared stream (v2)`);
+                    return getVideo2(securityKey, movieId, episodeId, resolution)
+                        .then(function(videoData) {
+                            return processVideoResponse(videoData, tmdbInfo, seasonNum, episodeNum, resolution, '[Shared]');
+                        });
+                });
+        })
+        .then(function(streams) {
+            console.log(`[Castle] Total streams found: ${streams.length}`);
+
+            // Sort streams by quality (highest first)
+            streams.sort(function(a, b) {
+                const qualityA = getQualityValue(a.quality);
+                const qualityB = getQualityValue(b.quality);
+                return qualityB - qualityA; // Higher quality first
+            });
+
+            return streams;
+        })
+        .catch(function(error) {
+            console.error(`[Castle] Error: ${error.message}`);
+            throw error;
+        });
+}
+
+// Search movies/shows via Castle search API
+function searchMovies(keyword = '', page = 1, size = 20) {
+    return getSecurityKey()
+        .then(function(securityKey) {
+            return searchCastle(securityKey, keyword || 'popular', page, size)
+                .then(function(result) {
+                    const data = extractDataBlock(result);
+                    const rows = data.rows || [];
+                    return rows
+                        .map(mapSearchItem)
+                        .filter(function(item) {
+                            return item.id;
+                        });
+                });
+        });
 }
 
 // Export for React Native compatibility
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getStreams };
-} else {
-    global.getStreams = getStreams;
+    module.exports = { getStreams, searchMovies };
+} else if (typeof globalThis !== 'undefined') {
+    globalThis.CastleAPI = { getStreams, searchMovies };
 }

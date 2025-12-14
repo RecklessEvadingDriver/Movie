@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nightstream | Dark Movie Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1021;
+      --panel: #0f162e;
+      --muted: #a9b7d0;
+      --text: #f3f5ff;
+      --accent: #6dd3ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(109, 211, 255, 0.08), transparent 25%),
+                  radial-gradient(circle at 80% 10%, rgba(245, 176, 255, 0.08), transparent 25%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 28px 48px;
+    }
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .brand {
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand span {
+      display: inline-flex;
+      width: 12px;
+      height: 12px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #6dd3ff, #7c6bff);
+      box-shadow: 0 0 0 6px rgba(109, 211, 255, 0.18);
+    }
+    .pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: 0.01em;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+    }
+    .panel {
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.35);
+    }
+    .player-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .video-wrap {
+      position: relative;
+      background: #0a0f1d;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #060913;
+      min-height: 320px;
+    }
+    .glass {
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .title {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .meta-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .synopsis {
+      margin: 12px 0 4px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .field {
+      flex: 1;
+      min-width: 220px;
+      position: relative;
+    }
+    .field input {
+      width: 100%;
+      padding: 11px 12px 11px 36px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    .field .icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.5;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      cursor: pointer;
+      min-height: 230px;
+      background: #11172d;
+      transition: transform 180ms ease, box-shadow 180ms ease, border 180ms ease;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+    .card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0, 0, 0, 0) 60%, rgba(6, 10, 19, 0.8) 100%);
+    }
+    .card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: saturate(1.1);
+    }
+    .card .info {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      z-index: 2;
+    }
+    .card .info h3 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+    .card .info p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 20px 0;
+    }
+    .badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(109, 211, 255, 0.14);
+      color: #c6ecff;
+      border: 1px solid rgba(109, 211, 255, 0.3);
+      font-size: 12px;
+    }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      body { padding: 24px 16px 36px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="brand"><span></span>Nightstream</div>
+      <div class="pill">Dark interface · HLS streaming</div>
+    </header>
+
+    <div class="layout">
+      <section class="panel player-shell">
+        <div class="video-wrap">
+          <video id="video" controls playsinline preload="metadata"></video>
+        </div>
+        <div class="glass">
+          <div class="meta-line" id="statusRow">
+            <span class="badge" id="streamStatus">Live HLS</span>
+            <span id="metaRuntime"></span>
+            <span id="metaRating"></span>
+          </div>
+          <h2 class="title" id="metaTitle">Loading…</h2>
+          <div class="meta-line" id="metaTags"></div>
+          <p class="synopsis" id="metaSynopsis">Please select a title to start streaming.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="controls">
+          <div class="field">
+            <div class="icon">🔎</div>
+            <input id="search" type="search" placeholder="Search by title, tag, or year…" aria-label="Search movies">
+          </div>
+          <div class="pill" id="resultCount">0 titles</div>
+        </div>
+        <div id="grid" class="grid"></div>
+        <div class="empty" id="emptyState" hidden>No movies match your search.</div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const state = { movies: [], activeId: null };
+    const grid = document.getElementById('grid');
+    const search = document.getElementById('search');
+    const emptyState = document.getElementById('emptyState');
+    const resultCount = document.getElementById('resultCount');
+    const titleEl = document.getElementById('metaTitle');
+    const tagsEl = document.getElementById('metaTags');
+    const synopsisEl = document.getElementById('metaSynopsis');
+    const runtimeEl = document.getElementById('metaRuntime');
+    const ratingEl = document.getElementById('metaRating');
+    const statusEl = document.getElementById('streamStatus');
+    const video = document.getElementById('video');
+    let hlsPlayer;
+
+    async function fetchMovies() {
+      const res = await fetch('/api/movies');
+      const payload = await res.json();
+      state.movies = payload.data || [];
+      renderCards(state.movies);
+      if (state.movies.length) {
+        playMovie(state.movies[0].id);
+      }
+    }
+
+    function renderCards(list) {
+      grid.innerHTML = '';
+      emptyState.hidden = list.length > 0;
+      resultCount.textContent = `${list.length} title${list.length === 1 ? '' : 's'}`;
+
+      list.forEach((movie) => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.setAttribute('tabindex', '0');
+        card.dataset.id = movie.id;
+        card.innerHTML = `
+          <img src="${movie.poster}" alt="${movie.title} poster">
+          <div class="info">
+            <h3>${movie.title}</h3>
+            <p>${movie.year} · ${movie.runtime}</p>
+          </div>
+        `;
+        card.addEventListener('click', () => playMovie(movie.id));
+        card.addEventListener('keypress', (evt) => {
+          if (evt.key === 'Enter' || evt.key === ' ') {
+            evt.preventDefault();
+            playMovie(movie.id);
+          }
+        });
+        grid.appendChild(card);
+      });
+    }
+
+    function setStatus(text, intent = 'info') {
+      statusEl.textContent = text;
+      statusEl.style.background = intent === 'error'
+        ? 'rgba(255, 142, 142, 0.14)'
+        : 'rgba(109, 211, 255, 0.14)';
+      statusEl.style.color = intent === 'error' ? '#ffd4d4' : '#c6ecff';
+      statusEl.style.borderColor = intent === 'error'
+        ? 'rgba(255, 142, 142, 0.3)'
+        : 'rgba(109, 211, 255, 0.3)';
+    }
+
+    async function playMovie(id) {
+      const movie = state.movies.find((item) => item.id === id);
+      if (!movie) return;
+
+      state.activeId = id;
+      titleEl.textContent = movie.title;
+      tagsEl.innerHTML = [
+        movie.year ? `<span class="chip">${movie.year}</span>` : '',
+        movie.runtime ? `<span class="chip">${movie.runtime}</span>` : '',
+        movie.rating ? `<span class="chip">${movie.rating}</span>` : '',
+        ...(movie.tags || []).map((tag) => `<span class="chip">${tag}</span>`)
+      ].join('');
+      synopsisEl.textContent = movie.synopsis || 'No synopsis provided.';
+      runtimeEl.textContent = movie.runtime ? `Runtime: ${movie.runtime}` : '';
+      ratingEl.textContent = movie.rating ? `Rated ${movie.rating}` : '';
+      setStatus('Loading stream…');
+
+      if (hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+      }
+
+      try {
+        const stream = await loadStream(movie);
+
+        if (!stream || !stream.url) {
+          throw new Error('No stream URL available');
+        }
+
+        if (hlsPlayer) {
+          hlsPlayer.destroy();
+          hlsPlayer = null;
+        }
+
+        if (window.Hls && Hls.isSupported()) {
+          hlsPlayer = new Hls({
+            enableWorker: true,
+            xhrSetup: (xhr) => {
+              if (stream.headers) {
+                Object.entries(stream.headers).forEach(([key, value]) => {
+                  xhr.setRequestHeader(key, value);
+                });
+              }
+            }
+          });
+          hlsPlayer.loadSource(stream.url);
+          hlsPlayer.attachMedia(video);
+          hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = stream.url;
+          video.play().catch(() => {});
+        } else {
+          alert('Your browser does not support HLS playback.');
+        }
+
+        setStatus('Streaming via Castle', 'info');
+      } catch (error) {
+        console.error('Playback error', error);
+        setStatus('Stream unavailable, using fallback', 'error');
+
+        if (window.Hls && Hls.isSupported()) {
+          hlsPlayer = new Hls({ enableWorker: true });
+          hlsPlayer.loadSource(movie.hlsUrl);
+          hlsPlayer.attachMedia(video);
+          hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = movie.hlsUrl;
+          video.play().catch(() => {});
+        } else {
+          alert('Your browser does not support HLS playback.');
+        }
+      }
+    }
+
+    async function loadStream(movie) {
+      if (!movie.tmdbId) {
+        return { url: movie.hlsUrl };
+      }
+
+      const params = new URLSearchParams({
+        tmdbId: movie.tmdbId,
+        type: movie.mediaType || 'movie'
+      });
+
+      if (movie.season) params.set('season', movie.season);
+      if (movie.episode) params.set('episode', movie.episode);
+
+      const res = await fetch(`/api/streams?${params.toString()}`);
+      if (!res.ok) throw new Error('Stream lookup failed');
+
+      const payload = await res.json();
+      const stream = (payload.data || [])[0];
+      return stream || { url: movie.hlsUrl };
+    }
+
+    search.addEventListener('input', () => {
+      const term = search.value.toLowerCase().trim();
+      const filtered = state.movies.filter((movie) => {
+        return (
+          movie.title.toLowerCase().includes(term) ||
+          (movie.tags || []).some((tag) => tag.toLowerCase().includes(term)) ||
+          (movie.year && movie.year.toString().includes(term))
+        );
+      });
+      renderCards(filtered);
+    });
+
+    fetchMovies().catch(() => {
+      emptyState.hidden = false;
+      emptyState.textContent = 'Unable to load movies from the server.';
+    });
+  </script>
+</body>
+</html>

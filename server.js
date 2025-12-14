@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
-const { getStreams } = require('./castle');
+const { getStreams, searchMovies } = require('./castle');
 
 const app = express();
 const parsedPort = parseInt(process.env.PORT, 10);
@@ -72,8 +72,15 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.get('/api/movies', (_req, res) => {
-  res.json({ data: movies });
+app.get('/api/movies', async (req, res) => {
+  const { q = 'popular', page = '1', size = '18' } = req.query;
+  try {
+    const results = await searchMovies(String(q), Number(page), Number(size));
+    res.json({ data: results });
+  } catch (error) {
+    console.error('[api/movies] Failed to load catalog:', error.message || error);
+    res.status(500).json({ error: 'Failed to fetch catalog' });
+  }
 });
 
 app.get('/api/streams', async (req, res) => {

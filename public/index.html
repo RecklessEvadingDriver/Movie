@@ -405,25 +405,13 @@
         console.error('Playback error', error);
         setStatus('Stream unavailable, using fallback', 'error');
 
-        if (window.Hls && Hls.isSupported()) {
-          hlsPlayer = new Hls({ enableWorker: true });
-          hlsPlayer.loadSource(movie.hlsUrl);
-          hlsPlayer.attachMedia(video);
-          hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
-            video.play().catch(handleAutoplayError);
-          });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          video.src = movie.hlsUrl;
-          video.play().catch(handleAutoplayError);
-        } else {
-          setStatus('Your browser does not support HLS playback.', 'error');
-        }
+        setStatus('Stream unavailable. Please try another title.', 'error');
       }
     }
 
     async function loadStream(movie) {
       if (!movie.tmdbId) {
-        return { url: movie.hlsUrl };
+        return null;
       }
 
       const params = new URLSearchParams({
@@ -439,7 +427,7 @@
 
       const payload = await res.json();
       const stream = (payload.data || [])[0];
-      return stream || { url: movie.hlsUrl };
+      return stream || null;
     }
 
     search.addEventListener('input', () => {

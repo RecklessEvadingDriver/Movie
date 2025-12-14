@@ -26,6 +26,23 @@ function requireApkSignKey() {
     return APK_SIGN_KEY;
 }
 
+function mapSearchItem(item) {
+    const title = item.title || item.name || 'Unknown';
+    const year = item.releaseYear || item.year || null;
+    const tmdbId = item.redirectId || item.redirectIdStr || item.id || null;
+    const mediaType = item.contentType === 2 ? 'tv' : 'movie';
+    const poster = item.coverVertical || item.coverHorizontal || item.cover || '';
+    return {
+        id: tmdbId ? String(tmdbId) : undefined,
+        title,
+        year,
+        mediaType,
+        poster,
+        runtime: item.duration ? `${item.duration} min` : '',
+        rating: item.rating || ''
+    };
+}
+
 // Working headers for Castle API
 const WORKING_HEADERS = {
     'User-Agent': 'okhttp/4.9.3',
@@ -631,9 +648,26 @@ function getStreams(tmdbId, mediaType, seasonNum, episodeNum) {
         });
 }
 
+// Search movies/shows via Castle search API
+function searchMovies(keyword = '', page = 1, size = 20) {
+    return getSecurityKey()
+        .then(function(securityKey) {
+            return searchCastle(securityKey, keyword || 'popular', page, size)
+                .then(function(result) {
+                    const data = extractDataBlock(result);
+                    const rows = data.rows || [];
+                    return rows
+                        .map(mapSearchItem)
+                        .filter(function(item) {
+                            return item.id;
+                        });
+                });
+        });
+}
+
 // Export for React Native compatibility
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { getStreams };
+    module.exports = { getStreams, searchMovies };
 } else if (typeof globalThis !== 'undefined') {
-    globalThis.CastleAPI = { getStreams };
+    globalThis.CastleAPI = { getStreams, searchMovies };
 }

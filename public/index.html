@@ -538,6 +538,11 @@
       isLoading: false
     };
 
+    // Constants for fallback content
+    const FALLBACK_POSTER = 'https://via.placeholder.com/300x450?text=No+Poster';
+    const FALLBACK_POSTER_SMALL = 'https://via.placeholder.com/50x75?text=N/A';
+    const FALLBACK_TITLE = 'Unknown Title';
+
     const grid = document.getElementById('grid');
     const search = document.getElementById('search');
     const emptyState = document.getElementById('emptyState');
@@ -615,14 +620,15 @@
         card.setAttribute('tabindex', '0');
         card.dataset.id = movie.id;
 
-        const posterUrl = movie.poster || 'https://via.placeholder.com/300x450?text=No+Poster';
+        const posterUrl = movie.poster || FALLBACK_POSTER;
         const mediaType = movie.mediaType === 'tv' ? 'TV' : 'Movie';
+        const title = movie.title || FALLBACK_TITLE;
 
         card.innerHTML = `
           <span class="type-badge">${mediaType}</span>
-          <img src="${posterUrl}" alt="${movie.title || 'Unknown'} poster" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+          <img src="${posterUrl}" alt="${title} poster" loading="lazy" onerror="this.src='${FALLBACK_POSTER}'">
           <div class="info">
-            <h3>${movie.title || 'Unknown Title'}</h3>
+            <h3>${title}</h3>
             <p>${movie.year || ''} ${movie.runtime ? '· ' + movie.runtime : ''}</p>
           </div>
         `;
@@ -647,12 +653,13 @@
       }
 
       quickList.innerHTML = items.map((movie) => {
-        const posterUrl = movie.poster || 'https://via.placeholder.com/50x75?text=N/A';
+        const posterUrl = movie.poster || FALLBACK_POSTER_SMALL;
+        const title = movie.title || FALLBACK_TITLE;
         return `
           <div class="quick-item" data-id="${movie.id}">
-            <img src="${posterUrl}" alt="${movie.title || 'Unknown'}" loading="lazy" onerror="this.src='https://via.placeholder.com/50x75?text=N/A'">
+            <img src="${posterUrl}" alt="${title}" loading="lazy" onerror="this.src='${FALLBACK_POSTER_SMALL}'">
             <div class="details">
-              <h4>${movie.title || 'Unknown'}</h4>
+              <h4>${title}</h4>
               <p>${movie.year || ''} · ${movie.mediaType === 'tv' ? 'TV Show' : 'Movie'}</p>
             </div>
           </div>
@@ -699,7 +706,7 @@
       if (!movie) return;
 
       state.activeId = id;
-      titleEl.textContent = movie.title || 'Unknown Title';
+      titleEl.textContent = movie.title || FALLBACK_TITLE;
       tagsEl.innerHTML = [
         movie.year ? `<span class="chip">${movie.year}</span>` : '',
         movie.mediaType ? `<span class="chip">${movie.mediaType === 'tv' ? 'TV Show' : 'Movie'}</span>` : '',

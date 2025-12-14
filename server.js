@@ -74,9 +74,18 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/movies', async (req, res) => {
   const { q = 'popular', page = '1', size = '18' } = req.query;
+  const pageNum = Math.max(1, Number(page) || 1);
+  const sizeNum = Math.min(50, Math.max(1, Number(size) || 18));
   try {
-    const results = await searchMovies(String(q), Number(page), Number(size));
-    res.json({ data: results });
+    const results = await searchMovies(String(q), pageNum, sizeNum);
+    res.json({
+      data: results,
+      pagination: {
+        page: pageNum,
+        size: sizeNum,
+        hasMore: results.length === sizeNum
+      }
+    });
   } catch (error) {
     console.error('[api/movies] Failed to load catalog:', error.message || error);
     res.status(500).json({ error: 'Failed to fetch catalog' });

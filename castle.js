@@ -3,8 +3,9 @@
 // Extracts streaming links using TMDB ID for Castle API with AES-CBC decryption
 
 // TMDB API Configuration
-const TMDB_API_KEY = (typeof process !== 'undefined' && process.env.TMDB_API_KEY) || '439c478a771f35c05022f9feabcca01c';
+const TMDB_API_KEY = (typeof process !== 'undefined' && process.env.TMDB_API_KEY) || '';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const CASTLE_DECRYPT_URL = (typeof process !== 'undefined' && process.env.CASTLE_DECRYPT_URL) || 'https://aesdec.nuvioapp.space/decrypt-castle';
 
 // Castle API Configuration
 const CASTLE_BASE = 'https://api.fstcy.com';
@@ -45,7 +46,7 @@ function decryptCastle(encryptedB64, securityKeyB64) {
         setTimeout(() => controller.abort(), 12000);
     }
 
-    return fetch('https://aesdec.nuvioapp.space/decrypt-castle', {
+    return fetch(CASTLE_DECRYPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller ? controller.signal : undefined,
@@ -284,6 +285,9 @@ function extractDataBlock(obj) {
 
 // Get movie/TV show details from TMDB
 function getTMDBDetails(tmdbId, mediaType) {
+    if (!TMDB_API_KEY) {
+        throw new Error('TMDB_API_KEY is required. Set the TMDB_API_KEY environment variable to enable Castle streams.');
+    }
     const endpoint = mediaType === 'tv' ? 'tv' : 'movie';
     const url = `${TMDB_BASE_URL}/${endpoint}/${tmdbId}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
     

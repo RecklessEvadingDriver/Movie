@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+  <script src="/hls.min.js"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -329,6 +329,14 @@
         : 'rgba(109, 211, 255, 0.3)';
     }
 
+    function resetPlayer() {
+      if (hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+      }
+      video.removeAttribute('src');
+    }
+
     async function playMovie(id) {
       const movie = state.movies.find((item) => item.id === id);
       if (!movie) return;
@@ -337,8 +345,6 @@
       titleEl.textContent = movie.title;
       tagsEl.innerHTML = [
         movie.year ? `<span class="chip">${movie.year}</span>` : '',
-        movie.runtime ? `<span class="chip">${movie.runtime}</span>` : '',
-        movie.rating ? `<span class="chip">${movie.rating}</span>` : '',
         ...(movie.tags || []).map((tag) => `<span class="chip">${tag}</span>`)
       ].join('');
       synopsisEl.textContent = movie.synopsis || 'No synopsis provided.';
@@ -346,10 +352,7 @@
       ratingEl.textContent = movie.rating ? `Rated ${movie.rating}` : '';
       setStatus('Loading stream…');
 
-      if (hlsPlayer) {
-        hlsPlayer.destroy();
-        hlsPlayer = null;
-      }
+      resetPlayer();
 
       try {
         const stream = await loadStream(movie);
@@ -358,10 +361,7 @@
           throw new Error('No stream URL available');
         }
 
-        if (hlsPlayer) {
-          hlsPlayer.destroy();
-          hlsPlayer = null;
-        }
+        resetPlayer();
 
         if (window.Hls && Hls.isSupported()) {
           hlsPlayer = new Hls({

@@ -3,10 +3,7 @@ const express = require('express');
 const { getStreams } = require('./castle');
 
 const app = express();
-const PORT = (() => {
-  const parsed = parseInt(process.env.PORT, 10);
-  return parsed >= 1 && parsed <= 65535 ? parsed : 3000;
-})();
+const PORT = Number(process.env.PORT) || 3000;
 
 const movies = [
   {
@@ -60,6 +57,9 @@ const movies = [
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('/hls.min.js', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'node_modules', 'hls.js', 'dist', 'hls.min.js'));
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
@@ -87,7 +87,7 @@ app.get('/api/streams', async (req, res) => {
 
     res.json({ data: streams });
   } catch (error) {
-    console.error('[api/streams] Failed to load streams:', error ? error.message : 'unknown error');
+    console.error('[api/streams] Failed to load streams:', error.message || error.toString());
     res.status(500).json({ error: 'Failed to fetch streams' });
   }
 });
